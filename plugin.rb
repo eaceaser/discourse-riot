@@ -8,6 +8,10 @@ gem "ruby-lol", "0.11.4", :require_name => "lol"
 
 enabled_site_setting :riot_enabled
 
+ACCOUNTS_CUSTOM_FIELD ||= "discourse_riot_accounts".freeze
+
+DiscoursePluginRegistry.serialized_current_user_fields << ACCOUNTS_CUSTOM_FIELD
+
 register_asset "javascripts/discourse/connectors/user-custom-preferences/riot.hbs"
 
 after_initialize do
@@ -19,11 +23,9 @@ after_initialize do
       isolate_namespace DiscourseRiot
     end
 
-
     TOKEN_REDIS_KEY_PREFIX ||= "riot_link_token:1".freeze
     TOKEN_FIELD_NAME ||= "discourse_riot_token".freeze
     TOKEN_TTL ||= 300
-    ACCOUNT_NAME_FIELD_NAME ||= "discourse_riot_account_name".freeze
 
     # TODO: Probably shouldn't be global.
     # TODO: Support multiple regions.
@@ -54,9 +56,31 @@ after_initialize do
     # TODO: Handle expired
     def self.validate_rune_page_token(user)
       payload = JSON.parse($redis.get(token_key(user)))
-      summoner = LOL_CLIENT.summoner.by_name(payload["account_name"])
-      runes = LOL_CLIENT.summoner.runes(summoner.first.id)[summoner.first.id.to_s]
-      runes.any? { |page| page.name.to_s == payload["token"].to_s }
+      summoner = LOL_CLIENT.summoner.by_name(payload["account_name"]).first
+      summoner_id = summoner.id
+      runes = LOL_CLIENT.summoner.runes(summoner_id)[summoner_id.to_s]
+      valid = runes.any? { |page| page.name.to_s == payload["token"].to_s }
+
+      if valid
+        save_riot_account(user, summoner_id)
+      end
+
+      valid
+    end
+
+    def self.save_riot_account(user, riot_id)
+      accounts = user.custom_fields[ACCOUNTS_CUSTOM_FIELD] || []
+      payload = {
+        :id => riot_id,
+        :region => "na"
+      }
+      accounts.push payload
+      user.custom_fields[ACCOUNTS_CUSTOM_FIELD] = accounts.to_json
+      user.save_custom_fields(true)
+    end
+
+    def self.lookup_riot_name_from_id(riot_id, region)
+      LOL_CLIENT.summoner.name(riot_id)[riot_id.to_s]
     end
 
     require_dependency 'application_controller'
@@ -87,5 +111,16 @@ after_initialize do
       mount ::DiscourseRiot::Engine, at: "/riot"
     end
   end
-end
 
+  User.register_custom_field_type(ACCOUNTS_CUSTOM_FIELD, :json)
+
+  # TODO: Probably should not put an API call here in the serializer.
+  add_to_serializer(:user, :riot_accounts, false) do
+    custom_fields[ACCOUNTS_CUSTOM_FIELD].each do |riot_account|
+      riot_id = riot_account["id"]
+      account_name = ::DiscourseRiot.lookup_riot_name_from_id(riot_id, "na")
+      riot_account["name"] = account_name
+      riot_account
+    end
+  end
+end

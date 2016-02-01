@@ -2,6 +2,9 @@
   <div class="control-group" id="riot">
       <label class="control-label">{{i18n 'riot.title'}}</label>
       <div class="controls">
+          {{#each model.riot_accounts}}
+            <p>{{this.name}}</p>
+          {{/each}}
           <a href class='btn' {{action 'addRiotLink'}}>
               {{fa-icon "plus"}}
               {{i18n 'riot.add_account'}}
