@@ -1,0 +1,36 @@
+<div class="modal-body riot-account-link">
+    {{#if waitingForConfirmation}}
+        <div>
+            <p>{{i18n 'riot.change_rune_page'}}</p>
+            <p>{{model.riot_token}}</p>
+        </div>
+    {{else}}
+        <div>
+            <form>
+                <table>
+                    <tr class="input">
+                        <td class="label"><label for="riot_name">{{ i18n 'riot.enter_summoner_name' }}</label></td>
+                        <td>
+                            {{input type="text" id='riot_name' name='riot_name' value=model.riot_name}}
+                        </td>
+                    </tr>
+                    <tr class="input">
+                        <td class="label"><label for="riot_region">{{ i18n 'riot.enter_region' }}</label></td>
+                        <td>
+                            {{combo-box valueAttribute="value" content=riotRegions value=model.riot_region}}
+                        </td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+    {{/if}}
+</div>
+
+<div class="modal-footer">
+    {{#if waitingForConfirmation}}
+        <button class="btn btn-large btn-primary" {{action "confirmLink"}}>{{i18n 'riot.confirm_account'}}</button>
+    {{else}}
+        <button class="btn btn-large btn-primary" {{action "linkAccount"}}>{{i18n 'riot.link_account'}}</button>
+    {{/if}}
+    <button class="btn btn-large btn-danger pull-right" {{action "cancelLink"}}>{{i18n "riot.cancel_link"}}</button>
+</div>

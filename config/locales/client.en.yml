@@ -1,0 +1,26 @@
+en:
+  js:
+    riot:
+      title: "League of Legends Summoners"
+      add_account: "Add a new Summoner"
+      account_link_title: "Link your Summoner"
+      enter_region: "Choose the Region you play on"
+      enter_summoner_name: "Enter your Summoner Name"
+      confirm_account: "Confirm Your Summoner"
+      cancel_link: "Cancel Linking"
+      change_rune_page: "Change a rune page name to the following number:"
+      link_account: "Begin Linking"
+      link_failed: "Unable to confirm Riot account. Did you change your rune page name?"
+
+      regions:
+        br: "Brazil"
+        eune: "EU Nordic & East"
+        euw: "EU West"
+        kr: "Korea"
+        lan: "Latin America North"
+        las: "Latin America South"
+        na: "North America"
+        oce: "Oceania"
+        pbe: "Public Beta Environment"
+        ru: "Russia"
+        tr: "Turkey"

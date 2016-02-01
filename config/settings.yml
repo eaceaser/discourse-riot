@@ -1,0 +1,6 @@
+plugins:
+  riot_enabled:
+    default: true
+    client: true
+  riot_api_key:
+    client: false

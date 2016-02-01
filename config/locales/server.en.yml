@@ -1,0 +1,4 @@
+en:
+  site_settings:
+    riot_enabled: Enable Riot API Integration.
+    riot_api_key: An authorized Riot API Key.
