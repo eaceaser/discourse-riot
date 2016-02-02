@@ -24,19 +24,31 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   actions: {
     linkAccount() {
+      const self = this;
       Discourse.ajax('/riot/link', {method: "POST", data: this.model}).then((res) => {
+        // TODO: I'm sure theres a better way to do this
+        $("#modal-alert").hide();
         this.set("model.riot_token", res.token);
         this.setProperties({"waitingForConfirmation": true});
+      }).catch((e) => {
+        if (e.jqXHR && e.jqXHR.responseJSON) {
+          const errorBody = e.jqXHR.responseJSON.errors.join(", ");
+          self.flash(errorBody, 'error');
+        } else {
+          console.log(e);
+          self.flash(I18n.t("riot.link.unknown_error"), 'error');
+        }
       });
     },
     confirmLink() {
       const self = this;
       Discourse.ajax('/riot/link/confirm', {method: "POST", data: this.model}).then((res) => {
         if (res.confirmed) {
+          // TODO: I'm sure theres a better way to do this
+          $("#modal-alert").hide();
           this.setProperties({"confirmed": true});
-          console.log("HI");
         } else {
-          self.flash(I18n.t('riot.link.failed'));
+          self.flash(I18n.t('riot.link.failed'), 'error');
         }
       });
     },

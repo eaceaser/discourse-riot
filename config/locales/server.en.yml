@@ -2,3 +2,8 @@ en:
   site_settings:
     riot_enabled: Enable Riot API Integration.
     riot_api_key: An authorized Riot API Key.
+  riot:
+    account_not_found: Riot account not found for that name and region.
+    account_name_empty: Riot account name not specified.
+    region_empty: Riot region not specified.
+    account_already_linked: A Riot account with this name has already been linked.
