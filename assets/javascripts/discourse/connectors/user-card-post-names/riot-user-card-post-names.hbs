@@ -1,9 +1,9 @@
 {{#if this.siteSettings.riot_enabled}}
-  test
-  <h3>
-    {{#each acct in model.riot_accounts}}
-      {{acct.name}}
-      {{#unless @last}} ● {{/unless}}
+  <h3 class="riot-list-item">
+    {{#each acct in user.riot_accounts}}
+      <div class="riot-list-item">
+          {{acct.riot_name}} ({{acct.riot_league}})
+      </div>
     {{/each}}
   </h3>
 {{/if}}

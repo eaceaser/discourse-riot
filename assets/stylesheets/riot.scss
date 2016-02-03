@@ -1,0 +1,16 @@
+div.riot-list-item {
+  content: " ● ";
+  margin-right: 5px;
+}
+
+div.riot-list-item:after  {
+  content: " ● ";
+}
+
+h3.riot-list-item {
+  display: flex;
+}
+
+div.riot-list-item:last-child:after {
+  content: "";
+}

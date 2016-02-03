@@ -40,7 +40,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
         if (res.confirmed) {
           // TODO: I'm sure theres a better way to do this
           $("#modal-alert").hide();
-          this.setProperties({"confirmed": true});
+          this.setProperties({"waitingForConfirmation": false, "confirmed": true});
         } else {
           self.flash(I18n.t('riot.link.failed'), 'error');
         }

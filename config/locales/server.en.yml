@@ -7,3 +7,11 @@ en:
     account_name_empty: Riot account name not specified.
     region_empty: Riot region not specified.
     account_already_linked: A Riot account with this name has already been linked.
+    league:
+      unranked: Unranked
+      bronze: Bronze
+      silver: Silver
+      gold: Gold
+      platinum: Platinum
+      diamond: Diamond
+      challenger: Challenger

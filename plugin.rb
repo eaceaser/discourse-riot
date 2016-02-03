@@ -15,6 +15,7 @@ DiscoursePluginRegistry.serialized_current_user_fields << ACCOUNTS_CUSTOM_FIELD
 
 register_asset "javascripts/discourse/connectors/user-custom-preferences/riot.hbs"
 register_asset "javascripts/discourse/connectors/user-card-post-names/riot-user-card-post-names.hbs"
+register_asset "stylesheets/riot.scss"
 
 after_initialize do
   module ::DiscourseRiot
@@ -95,6 +96,21 @@ after_initialize do
     def self.lookup_riot_name_from_id(riot_id, region)
       client = client_for(region)
       client.summoner.name(riot_id)[riot_id.to_s]
+    end
+
+    def self.lookup_league_for_id(riot_id, region)
+      begin
+        client = client_for(region)
+        leagues = client.league.get_entries(riot_id)[riot_id.to_s]
+        solo = leagues.find { |l| l.queue == "RANKED_SOLO_5x5" }
+        translate_league(solo.tier)
+      rescue Lol::NotFound
+        I18n.t("riot.league.unranked")
+      end
+    end
+
+    def self.translate_league(league)
+      I18n.t("riot.league.#{league.downcase}")
     end
   end
 
@@ -178,13 +194,22 @@ after_initialize do
     end
   end
 
-  # TODO: populate with riot info?
+  # TODO: cache this and don't do the lookup per request.
   User.class_eval do
     def riot_accounts
       if custom_fields[ACCOUNTS_CUSTOM_FIELD]
         parsed = JSON.parse(custom_fields[ACCOUNTS_CUSTOM_FIELD])
         parsed.map do |f|
-          ::DiscourseRiot::RiotAccountLink.new(self, f["riot_id"], f["riot_region"])
+          id = f["riot_id"]
+          region = f["riot_region"]
+          league = ::DiscourseRiot.lookup_league_for_id(id, region)
+          name = ::DiscourseRiot.lookup_riot_name_from_id(id, region)
+          {
+            riot_id: f["riot_id"],
+            riot_region: f["riot_region"],
+            riot_name: name,
+            riot_league: league
+          }
         end
       else
         []
@@ -205,7 +230,7 @@ after_initialize do
     attributes :riot_accounts
 
     def riot_accounts
-      ActiveModel::ArraySerializer.new(object.riot_accounts, each_serializer: ::RiotAccountLinkSerializer)
+      ActiveModel::ArraySerializer.new(object.riot_accounts)
     end
   end
 end

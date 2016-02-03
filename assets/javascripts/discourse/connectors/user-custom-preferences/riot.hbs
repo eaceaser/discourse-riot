@@ -3,7 +3,7 @@
       <label class="control-label">{{i18n 'riot.title'}}</label>
       <div class="controls">
           {{#each acct in model.riot_accounts}}
-            <p>{{acct.name}}</p>
+            <p>{{acct.riot_name}}</p>
           {{/each}}
           <a href class='btn' {{action 'addRiotLink'}}>
               {{fa-icon "plus"}}
