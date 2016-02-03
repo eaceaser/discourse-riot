@@ -15,10 +15,12 @@ export default Ember.Controller.extend(ModalFunctionality, {
     {name: I18n.t('riot.regions.tr'), value: "tr"}
   ],
   waitingForConfirmation: false,
+  confirmed: false,
 
   reset() {
     this.setProperties({
-      waitingForConfirmation: false
+      waitingForConfirmation: false,
+      confirmed: false
     });
   },
 
@@ -30,15 +32,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
         $("#modal-alert").hide();
         this.set("model.riot_token", res.token);
         this.setProperties({"waitingForConfirmation": true});
-      }).catch((e) => {
-        if (e.jqXHR && e.jqXHR.responseJSON) {
-          const errorBody = e.jqXHR.responseJSON.errors.join(", ");
-          self.flash(errorBody, 'error');
-        } else {
-          console.log(e);
-          self.flash(I18n.t("riot.link.unknown_error"), 'error');
-        }
-      });
+      }).catch(this._handleException.bind(self));
     },
     confirmLink() {
       const self = this;
@@ -50,11 +44,20 @@ export default Ember.Controller.extend(ModalFunctionality, {
         } else {
           self.flash(I18n.t('riot.link.failed'), 'error');
         }
-      });
+      }).catch(this._handleException.bind(self));
     },
     cancelLink() {
       this.reset();
       this.send("closeModal");
     }
+  },
+
+  _handleException(e) {
+    if (e.jqXHR && e.jqXHR.responseJSON) {
+      const errorBody = e.jqXHR.responseJSON.errors.join(", ");
+      this.flash(errorBody, 'error');
+    } else {
+      this.flash(I18n.t("riot.link.unknown_error"), 'error');
+    }
   }
-});
+})
