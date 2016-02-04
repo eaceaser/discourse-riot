@@ -95,7 +95,7 @@ after_initialize do
     end
 
     def self.save_riot_account(user, riot_id, riot_region)
-      RiotAccountLink.new(user, riot_id, riot_region).save
+      RiotAccountLink.new(user.id, riot_id, riot_region).save
     end
 
     def self.lookup_riot_name_from_id(riot_id, region)
