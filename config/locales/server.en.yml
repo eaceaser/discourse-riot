@@ -7,6 +7,7 @@ en:
     account_name_empty: Riot account name not specified.
     region_empty: Riot region not specified.
     account_already_linked: A Riot account with this name has already been linked.
+    link_expired: Account linking expired. Please cancel and try again.
     league:
       unranked: Unranked
       bronze: Bronze

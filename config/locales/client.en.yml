@@ -11,10 +11,11 @@ en:
       change_rune_page: "Change a rune page name to the following number:"
       link_account: "Begin Linking"
       close: "Close"
+      account_confirmed: "Riot account successfully linked."
       link:
         failed: "Unable to confirm Riot account. Did you change your rune page name?"
         unknown_error: "An unknown error occurred when linking an account."
-
+      unlink_failed: "An error occurred when unlinking a Riot account."
 
       regions:
         br: "Brazil"

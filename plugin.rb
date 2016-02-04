@@ -10,6 +10,7 @@ gem "ruby-lol", "0.11.4", :require_name => "lol"
 enabled_site_setting :riot_enabled
 
 ACCOUNTS_CUSTOM_FIELD ||= "discourse_riot_accounts".freeze
+CACHE_NAMESPACE ||= "discourse_riot".freeze
 
 DiscoursePluginRegistry.serialized_current_user_fields << ACCOUNTS_CUSTOM_FIELD
 
@@ -19,7 +20,7 @@ register_asset "stylesheets/riot.scss"
 
 after_initialize do
   module ::DiscourseRiot
-    require_dependency 'rest_client'
+    @cache = ::Cache.new(:namespace => CACHE_NAMESPACE)
 
     class Engine < ::Rails::Engine
       engine_name "discourse_riot"
@@ -72,9 +73,13 @@ after_initialize do
       "#{TOKEN_REDIS_KEY_PREFIX}:#{user.id}"
     end
 
-    # TODO: Handle expired
     def self.validate_rune_page_token(user)
-      payload = JSON.parse($redis.get(token_key(user)))
+      cached = $redis.get(token_key(user))
+      if cached.nil?
+        raise Discourse::NotFound
+      end
+
+      payload = JSON.parse(cached)
       region = payload["account_region"]
       client = client_for(region)
       summoner = client.summoner.by_name(payload["account_name"]).first
@@ -112,6 +117,32 @@ after_initialize do
     def self.translate_league(league)
       I18n.t("riot.league.#{league.downcase}")
     end
+
+    def self.get_payload_for_user(user)
+        if user.custom_fields[ACCOUNTS_CUSTOM_FIELD]
+          parsed = JSON.parse(user.custom_fields[ACCOUNTS_CUSTOM_FIELD])
+          parsed.map do |f|
+            id = f["riot_id"]
+            region = f["riot_region"]
+
+            remote_info = @cache.fetch("summoner:#{region}:#{id}") do
+              league = lookup_league_for_id(id, region)
+              name = lookup_riot_name_from_id(id, region)
+              { riot_name: name,
+                riot_league: league
+              }
+            end
+
+            remote_info.merge({
+              riot_id: f["riot_id"],
+              riot_region: f["riot_region"]
+            })
+          end
+        else
+          []
+        end
+#      end
+    end
   end
 
   # Controllers
@@ -142,13 +173,48 @@ after_initialize do
     end
 
     def confirm_link
-      rv = ::DiscourseRiot.validate_rune_page_token(current_user)
-      render json: {confirmed: rv}
+      begin
+        rv = ::DiscourseRiot.validate_rune_page_token(current_user)
+        render json: {confirmed: rv}
+      rescue Discourse::NotFound => e
+        render json: {errors: [I18n.t("riot.link_expired")]}, status: 404
+      end
+    end
+
+    def delete_link
+      begin
+        riot_id = params[:riot_id].to_i
+        if riot_id.nil?
+          raise Discourse::InvalidParameters.new I18n.t("riot.account_id_empty")
+        end
+
+        riot_region = params[:riot_region]
+        if riot_region.nil?
+          raise Discourse::InvalidParameters.new I18n.t("riot.region_empty")
+        end
+
+        links = ::DiscourseRiot::RiotAccountLink.where(current_user.id)
+        if links.nil? || links.empty?
+          raise Discourse::NotFound
+        end
+
+        l = links.find { |l| l.riot_id == riot_id && l.riot_region == riot_region }
+        if l.nil?
+          raise Discourse::NotFound
+        end
+        l.delete
+        render :nothing => true, status: 204
+      rescue Discourse::NotFound => e
+        render :nothing => true, status: 404
+      rescue Discourse::InvalidParameters => e
+        render json: {errors: [e.message]}, status: 400
+      end
     end
   end
 
   ::DiscourseRiot::Engine.routes.draw do
     post '/link' => 'riot#initiate_link'
+    delete '/link' => 'riot#delete_link'
     post '/link/confirm' => 'riot#confirm_link'
   end
 
@@ -164,12 +230,11 @@ after_initialize do
     define_method :riot_region, -> {object.riot_region}
   end
 
-  # TODO: Figure out what to do with user
-  ::DiscourseRiot::RiotAccountLink = Struct.new(:user, :riot_id, :riot_region) do
+  ::DiscourseRiot::RiotAccountLink = Struct.new(:user_id, :riot_id, :riot_region) do
     def self.where(user_id)
       if existing = UserCustomField.find_by_user_id_and_name(user_id, ACCOUNTS_CUSTOM_FIELD)
         x = JSON.parse(existing.value)
-        x.map { |v| ::DiscourseRiot::RiotAccountLink.new(nil, v["riot_id"], v["riot_region"]) }
+        x.map { |v| ::DiscourseRiot::RiotAccountLink.new(user_id, v["riot_id"], v["riot_region"]) }
       else
         nil
       end
@@ -177,43 +242,41 @@ after_initialize do
 
     def save
       UserCustomField.transaction do
-        if existing = UserCustomField.find_by_user_id_and_name(user.id, ACCOUNTS_CUSTOM_FIELD)
+        if existing = UserCustomField.find_by_user_id_and_name(user_id, ACCOUNTS_CUSTOM_FIELD)
           parsed = JSON.parse(existing.value)
           filtered = parsed.reject { |link| link.riot_id == riot_id && link.riot_region == riot_region }
           appended = filtered.push(self)
 
-          existing.value = appended.to_json
+          existing.value = ActiveModel::ArraySerializer.new(appended, each_serializer: ::RiotAccountLinkSerializer).to_json
           existing.save
         else
           payload = [self]
           to_serialize = ActiveModel::ArraySerializer.new(payload, each_serializer: ::RiotAccountLinkSerializer)
-          UserCustomField.create({ user_id: user.id, name: ACCOUNTS_CUSTOM_FIELD, value: to_serialize.to_json })
+          UserCustomField.create({ user_id: user_id, name: ACCOUNTS_CUSTOM_FIELD, value: to_serialize.to_json })
         end
       end
       self
     end
+
+    def delete
+      UserCustomField.transaction do
+        existing = UserCustomField.find_by_user_id_and_name(user_id, ACCOUNTS_CUSTOM_FIELD)
+        if existing
+          x = JSON.parse(existing.value)
+          rejected = x.map { |v| ::DiscourseRiot::RiotAccountLink.new(user_id, v["riot_id"], v["riot_region"]) }
+           .reject { |v| riot_id == v.riot_id && riot_region == v.riot_region }
+          existing.value = rejected.to_json
+          existing.save
+        end
+      end
+    end
   end
 
-  # TODO: cache this and don't do the lookup per request.
+  # User Serialization
+
   User.class_eval do
     def riot_accounts
-      if custom_fields[ACCOUNTS_CUSTOM_FIELD]
-        parsed = JSON.parse(custom_fields[ACCOUNTS_CUSTOM_FIELD])
-        parsed.map do |f|
-          id = f["riot_id"]
-          region = f["riot_region"]
-          league = ::DiscourseRiot.lookup_league_for_id(id, region)
-          name = ::DiscourseRiot.lookup_riot_name_from_id(id, region)
-          {
-            riot_id: f["riot_id"],
-            riot_region: f["riot_region"],
-            riot_name: name,
-            riot_league: league
-          }
-        end
-      else
-        []
-      end
+      ::DiscourseRiot::get_payload_for_user(self)
     end
 
     def save_custom_fields(force=false)
